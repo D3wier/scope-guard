@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: pip install -e .
+
+      - name: Verify import
+        run: python -c "from scope_guard import ScopeChecker; print('OK')"
+
+      - name: Verify CLI
+        run: scope-guard --help
+
+      - name: Run scope check tests
+        run: |
+          python -c "
+          from scope_guard import ScopeChecker
+          checker = ScopeChecker(
+              in_scope=[{'type': 'domain', 'value': '*.example.com'}],
+              out_of_scope=[{'type': 'domain', 'value': 'blog.example.com'}],
+          )
+          assert checker.check('https://api.example.com/test').in_scope == True
+          assert checker.check('https://blog.example.com').in_scope == False
+          assert checker.check('https://evil.com').in_scope == False
+          print('All tests passed!')
+          "
